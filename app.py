@@ -1,6 +1,9 @@
 import os
+import re
+import secrets
 import sqlite3
 import uuid
+import hmac
 from functools import wraps
 
 from flask import Flask, abort, flash, g, redirect, render_template_string, request, session, url_for
@@ -15,7 +18,15 @@ app = Flask(__name__)
 app.config.update(
     SECRET_KEY=SECRET_KEY,
     DATABASE=os.path.join(os.path.dirname(__file__), "memo.db"),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"},
 )
+
+MAX_USERNAME_LENGTH = 64
+MAX_PASSWORD_LENGTH = 128
+MAX_TITLE_LENGTH = 200
+MAX_CONTENT_LENGTH = 10000
 
 
 BASE_HTML = """
@@ -128,8 +139,65 @@ def init_db():
         db.commit()
 
 
+def get_csrf_token():
+    token = session.get("_csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["_csrf_token"] = token
+    return token
+
+
+@app.context_processor
+def inject_template_helpers():
+    return {"csrf_token": get_csrf_token}
+
+
+@app.before_request
+def validate_csrf():
+    if request.method == "POST":
+        session_token = session.get("_csrf_token")
+        submitted_token = request.form.get("_csrf_token", "")
+        if not session_token or not submitted_token or not hmac.compare_digest(session_token, submitted_token):
+            abort(400)
+
+
 def render_page(template, **context):
-    return render_template_string(BASE_HTML.replace("<!-- CONTENT -->", template), title="CRUCIO", **context)
+    rendered = render_template_string(BASE_HTML.replace("<!-- CONTENT -->", template), title="CRUCIO", **context)
+    csrf_input = '<input type="hidden" name="_csrf_token" value="{}">'.format(get_csrf_token())
+    return re.sub(r"(<form\b[^>]*>)", r"\1" + csrf_input, rendered, flags=re.IGNORECASE)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'none'; "
+        "img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'self'",
+    )
+    return response
+
+
+@app.errorhandler(400)
+def bad_request(_error):
+    return "잘못된 요청입니다.", 400
+
+
+@app.errorhandler(403)
+def forbidden(_error):
+    return "접근 권한이 없습니다.", 403
+
+
+@app.errorhandler(404)
+def not_found(_error):
+    return "요청한 페이지를 찾을 수 없습니다.", 404
+
+
+@app.errorhandler(500)
+def internal_error(_error):
+    return "서버 오류가 발생했습니다.", 500
 
 
 def login_required(view):
@@ -171,7 +239,7 @@ def register():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        if not username or not password:
+        if not username or not password or len(username) > MAX_USERNAME_LENGTH or len(password) > MAX_PASSWORD_LENGTH:
             flash("아이디와 비밀번호를 입력해주세요.")
             return render_page(REGISTER_HTML), 400
         try:
@@ -217,7 +285,7 @@ def memos():
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         content = request.form.get("content", "").strip()
-        if not title or not content:
+        if not title or not content or len(title) > MAX_TITLE_LENGTH or len(content) > MAX_CONTENT_LENGTH:
             flash("제목과 내용을 입력해주세요.")
             return render_page(MEMO_FORM_HTML, form_title="새 메모", memo=None), 400
         db.execute("INSERT INTO memos (id, user_id, title, content, is_private) VALUES (?, ?, ?, ?, 1)", (str(uuid.uuid4()), session["user_id"], title, content))
@@ -234,7 +302,7 @@ def new_memo():
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         content = request.form.get("content", "").strip()
-        if not title or not content:
+        if not title or not content or len(title) > MAX_TITLE_LENGTH or len(content) > MAX_CONTENT_LENGTH:
             flash("제목과 내용을 입력해주세요.")
             return render_page(MEMO_FORM_HTML, form_title="새 메모", memo=None), 400
         get_db().execute(
@@ -273,7 +341,7 @@ def edit_memo(memo_id):
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         content = request.form.get("content", "").strip()
-        if not title or not content:
+        if not title or not content or len(title) > MAX_TITLE_LENGTH or len(content) > MAX_CONTENT_LENGTH:
             flash("제목과 내용을 입력해주세요.")
             return render_page(MEMO_FORM_HTML, form_title="메모 수정", memo=memo), 400
         get_db().execute("UPDATE memos SET title = ?, content = ? WHERE id = ? AND user_id = ?", (title, content, memo_id, session["user_id"]))
@@ -305,4 +373,4 @@ init_db()
 
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    app.run(host="0.0.0.0", port=8000)
