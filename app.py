@@ -18,14 +18,139 @@ BASE_HTML = """
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ title }}</title>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #171717;
+            background: #f5f5f5;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+        }
+
+        main {
+            width: min(100% - 32px, 440px);
+            min-height: 100vh;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 0;
+        }
+
+        .card {
+            width: 100%;
+            padding: 40px;
+            background: #fff;
+            border: 1px solid #e7e7e7;
+            border-radius: 16px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin: 0 0 28px;
+            font-size: 28px;
+            letter-spacing: -0.04em;
+            text-align: center;
+        }
+
+        .alert {
+            width: 100%;
+            margin-bottom: 20px;
+            padding: 12px 14px;
+            color: #333;
+            background: #f1f1f1;
+            border: 1px solid #dedede;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .field { margin-bottom: 16px; }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
+            color: #404040;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        input {
+            display: block;
+            width: 100%;
+            padding: 12px 13px;
+            color: #171717;
+            background: #fff;
+            border: 1px solid #d4d4d4;
+            border-radius: 8px;
+            outline: none;
+            font: inherit;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        input:hover { border-color: #999; }
+
+        input:focus {
+            border-color: #171717;
+            box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.12);
+        }
+
+        button {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px 16px;
+            color: #fff;
+            background: #171717;
+            border: 1px solid #171717;
+            border-radius: 8px;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 600;
+            transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        button:hover {
+            background: #3a3a3a;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.14);
+        }
+
+        button:focus-visible {
+            outline: 3px solid rgba(23, 23, 23, 0.25);
+            outline-offset: 2px;
+        }
+
+        button:active { transform: translateY(1px); }
+
+        .switch {
+            margin: 22px 0 0;
+            color: #737373;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        a { color: #171717; font-weight: 600; }
+        a:hover { color: #666; }
+
+        @media (max-width: 480px) {
+            main { width: min(100% - 24px, 440px); padding: 20px 0; }
+            .card { padding: 28px 22px; border-radius: 12px; }
+            h1 { margin-bottom: 24px; font-size: 24px; }
+        }
+    </style>
 </head>
 <body>
     <main>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
-                <ul>
-                {% for message in messages %}<li>{{ message }}</li>{% endfor %}
-                </ul>
+                <div class="alert" role="alert">{{ messages[-1] }}</div>
             {% endif %}
         {% endwith %}
         <!-- CONTENT -->
@@ -35,31 +160,49 @@ BASE_HTML = """
 """
 
 REGISTER_HTML = """
-<h1>회원가입</h1>
-<form method="post">
-    <p><label>아이디 <input type="text" name="username" required autofocus></label></p>
-    <p><label>비밀번호 <input type="password" name="password" required></label></p>
-    <p><button type="submit">회원가입</button></p>
-</form>
-<p><a href="{{ url_for('login') }}">로그인</a></p>
+<section class="card">
+    <h1>회원가입</h1>
+    <form method="post">
+        <div class="field">
+            <label for="username">아이디</label>
+            <input id="username" type="text" name="username" required autofocus>
+        </div>
+        <div class="field">
+            <label for="password">비밀번호</label>
+            <input id="password" type="password" name="password" required>
+        </div>
+        <button type="submit">회원가입</button>
+    </form>
+    <p class="switch">이미 계정이 있나요? <a href="{{ url_for('login') }}">로그인</a></p>
+</section>
 """
 
 LOGIN_HTML = """
-<h1>로그인</h1>
-<form method="post">
-    <p><label>아이디 <input type="text" name="username" required autofocus></label></p>
-    <p><label>비밀번호 <input type="password" name="password" required></label></p>
-    <p><button type="submit">로그인</button></p>
-</form>
-<p><a href="{{ url_for('register') }}">회원가입</a></p>
+<section class="card">
+    <h1>로그인</h1>
+    <form method="post">
+        <div class="field">
+            <label for="username">아이디</label>
+            <input id="username" type="text" name="username" required autofocus>
+        </div>
+        <div class="field">
+            <label for="password">비밀번호</label>
+            <input id="password" type="password" name="password" required>
+        </div>
+        <button type="submit">로그인</button>
+    </form>
+    <p class="switch">계정이 없나요? <a href="{{ url_for('register') }}">회원가입</a></p>
+</section>
 """
 
 HOME_HTML = """
-<h1>메모 서비스</h1>
-<p>{{ username }}님, 로그인되어 있습니다.</p>
-<form method="post" action="{{ url_for('logout') }}">
-    <button type="submit">로그아웃</button>
-</form>
+<section class="card">
+    <h1>메모 서비스</h1>
+    <p>{{ username }}님, 로그인되어 있습니다.</p>
+    <form method="post" action="{{ url_for('logout') }}">
+        <button type="submit">로그아웃</button>
+    </form>
+</section>
 """
 
 
